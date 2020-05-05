@@ -15,6 +15,9 @@
 log/
 target/
 
+# Experiments
+files/
+
 # Binary classes
 bin/
 .factorypath
