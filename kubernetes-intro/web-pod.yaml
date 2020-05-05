@@ -12,7 +12,6 @@ spec: # Описание Pod
     volumeMounts:
       - name: app
         mountPath: /app
-
   initContainers:
     - name: init-web-pod
       image: busybox:1.31.0
@@ -20,7 +19,6 @@ spec: # Описание Pod
       volumeMounts:
         - name: app
           mountPath: /app
-
   volumes:
     - name: app
       emptyDir: {}
