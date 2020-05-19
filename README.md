@@ -2,6 +2,58 @@
 # ДЗ по курсу "Инфраструктурная платформа на основе Kubernetes"
 dimpon Platform repository
 
+
+# Выполнено ДЗ № 2
+
+ - [ ] Основное ДЗ развертывание Pod с помощью ReplicaSet и Deployment
+ - [ ] Задание со * организовать Blue/Green Deployment и Reverse Rolling Update Deployment. Развернуть DaemonSet с node-exporter
+
+## В процессе сделано:
+ - Развернут кластер с помощью Kind. Проведены эксперименты с ReplicaSet. ReplicaSet только следит за количесивом реплик, не обновляет Pod если обновился image,
+ в отличие от Deployment.
+ - выполнены задания со звездочкой
+
+## Как запустить проект:
+ - Blue/Green Deployment вариант №1
+    * Создать Service и 2 Deployment, у одного Deployment label.version = blue (replicas=3), у другого green(replicas=0). у Service selector настроен на blue
+    * У Green Deployment ставим новую версию image, replicas=3, запускаем apply.
+    * Переключаем Service на Green Deployment
+    * Применяем replicas=3 к Blue Deployment
+ - Blue/Green Deployment вариант №2
+    * Создаем Deployment с 
+    ```yaml   
+   rollingUpdate:
+      maxSurge: 100%
+      maxUnavailable: 0
+   ```
+    * в момент apply с новым image создается новый ReplicaSet, c новым image, подниматся pod-ы
+    * Затем начинают гасится Pod-ы старой ReplicaSet
+ - Reverse Rolling Update Deployment
+     * Создаем Deployment с 
+     ```yaml   
+    rollingUpdate:
+       maxSurge: 1
+       maxUnavailable: 0
+    ```
+     * в момент apply с новым image создается новый ReplicaSet, c новым image, подниматся pod-ы. 
+       Но каждый новый Pod будет подниматься только когда опустится 1 старый тк  maxSurge: 1
+ - Node Exporter развернут на всех нодах:
+ ```
+node-exporter-8sn8g               2/2     Running   0          2m25s   172.18.0.2    kind-worker3         <none>           <none>
+node-exporter-qqlld               2/2     Running   0          2m25s   172.18.0.3    kind-worker          <none>           <none>
+node-exporter-smt96               2/2     Running   0          2m25s   172.18.0.4    kind-worker2         <none>           <none>
+node-exporter-w8mqz               2/2     Running   0          2m25s   172.18.0.5    kind-control-plane   <none>           <none>
+```
+       
+## Как проверить работоспособность:
+ - Blue/Green Deployment: kubectl apply -f paymentservice-deployment-bg.yaml|  kubectl get rs -l app=paymentservice  -w
+ - Reverse Rolling Update Deployment: kubectl apply -f paymentservice-deployment-reverse.yaml|  kubectl get rs -l app=paymentservice  -w
+ - DaemonSet: kubectl apply -f node-exporter-daemonset.yaml  kubectl get pods -l app=node-exporter -o wide 
+
+
+## PR checklist:
+ - [ ] Выставлен label с темой домашнего задания
+
 # Выполнено ДЗ № 1
 
  - [ ] Основное ДЗ
