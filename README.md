@@ -2,7 +2,42 @@
 # ДЗ по курсу "Инфраструктурная платформа на основе Kubernetes"
 dimpon Platform repository
 
+# Выполнено ДЗ № 3
 
+ - [ ] Основное ДЗ. Coздать ServiceAccounts, в рамках namespace, назначить различные роли
+
+
+## В процессе сделано:
+ - Пункт 1
+ * Создать Service Account bob, дать ему роль admin в рамках всего
+ кластера
+ * Создать Service Account dave без доступа к кластеру
+ - Пункт 2
+ * Создать Namespace prometheus
+ * Создать Service Account carol в этом Namespace
+ * Дать всем Service Account в Namespace prometheus возможность
+ делать get, list, watch в отношении Pods всего кластера
+ - Пункт 3
+ * Создать Namespace dev
+ * Создать Service Account jane в Namespace dev
+ * Дать jane роль admin в рамках Namespace dev
+ * Создать Service Account ken в Namespace dev
+ * Дать ken роль view в рамках Namespace dev
+
+
+## Как запустить проект:
+ - kubectl apply -f ....
+:
+
+## Как проверить работоспособность:
+ - kubectl get serviceaccounts -n dev
+ - kubectl get clusterroles -n dev | grep -v system:
+ - kubectl get clusterrolebindings -n dev | grep -v system
+
+## PR checklist:
+ - [ ] Выставлен label с темой домашнего задания
+ 
+ 
 # Выполнено ДЗ № 2
 
  - [ ] Основное ДЗ развертывание Pod с помощью ReplicaSet и Deployment
