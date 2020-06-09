@@ -2,6 +2,9 @@
 # ДЗ по курсу "Инфраструктурная платформа на основе Kubernetes"
 dimpon Platform repository
 
+
+
+
 # Выполнено ДЗ №5
 
  - [ ] Основное ДЗ: Создать StatefulSet c - локальным S3 хранилищем
@@ -91,6 +94,33 @@ minio123
 ## PR checklist:
  - [ ] Выставлен label с темой домашнего задания
 
+# Выполнено ДЗ № 4
+
+ - [ ] Основное ДЗ сравнение iptables и IPVS, усановка MetalLB, развертывание Services(ClusterIP,LoadBalancer,Headless), Ingress
+ - [ ] Задание со * Настроить service для внутреннего dns сервера
+
+## В процессе сделано:
+ - создал Deployment c 3 replicas, поигрались с readinessProbe, livenessProbe 
+ - создал Service с ClusterIP
+ - включил IPVS
+ - поставил MetalLB
+ - создал Service c LoadBalancer, сделал *
+ - создал Headless Service, Ingress
+
+## Как запустить проект:
+ - применить все манифесты. 
+ - minikube ip  > ip route add 172.17.255.0/24 via <minikube ip>
+ - dashboard kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.1/aio/deploy/recommended.yaml
+ 
+
+## Как проверить работоспособность:
+ - open http://172.17.255.1/index.html
+ - open http://172.17.255.2/web/index.html
+ - для * nslookup dns-udp-svc.kube-system.svc.cluster.local  172.17.255.10
+ - nslookup web-svc-cip.default.svc.cluster.local  172.17.255.10
+
+## PR checklist:
+ - [ ] Выставлен label с темой домашнего задания
 
 # Выполнено ДЗ № 3
 
