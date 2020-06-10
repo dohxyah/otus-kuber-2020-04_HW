@@ -100,12 +100,12 @@ minio123
  - [ ] Задание со * Настроить service для внутреннего dns сервера
 
 ## В процессе сделано:
- - создал Deployment c 3 replicas, поигрались с readinessProbe, livenessProbe 
+ - создал Deployment c 3 replicas, (maxSurge=0 maxUnavailable=0 запуски невозможен) поигрались с readinessProbe, livenessProbe (при livenessProbe.exec ксли проблемы,команда должна возвращать зачение отличное от 0) 
  - создал Service с ClusterIP
  - включил IPVS
  - поставил MetalLB
  - создал Service c LoadBalancer, сделал *
- - создал Headless Service, Ingress
+ - создал Headless Service, Ingress, сделал *
 
 ## Как запустить проект:
  - применить все манифесты. 
@@ -118,6 +118,8 @@ minio123
  - open http://172.17.255.2/web/index.html
  - для * nslookup dns-udp-svc.kube-system.svc.cluster.local  172.17.255.10
  - nslookup web-svc-cip.default.svc.cluster.local  172.17.255.10
+ - для * open dashboard https://172.17.255.2/dashboard/#/overview?namespace=default
+ - для * curl -v -H "canary-header: true" http://someserver.com/    curl -v  http://someserver.com/
 
 ## PR checklist:
  - [ ] Выставлен label с темой домашнего задания

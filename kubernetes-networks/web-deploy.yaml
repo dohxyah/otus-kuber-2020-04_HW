@@ -11,10 +11,8 @@ spec:
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 1
+      maxUnavailable: 100%
       maxSurge: 100%
-
-
   template:
     metadata:
       name: web # Название Pod
