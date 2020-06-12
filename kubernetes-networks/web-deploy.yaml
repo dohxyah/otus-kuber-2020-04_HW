@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web # Название нашего объекта Deployment
+spec:
+  replicas: 3 # Начнем с одного пода
+  selector: # Укажем, какие поды относятся к нашему Deployment:
+    matchLabels: # - это поды с меткой
+      app: web # app и ее значением web
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 100%
+      maxSurge: 100%
+  template:
+    metadata:
+      name: web # Название Pod
+      labels:
+        app: web # Метки в формате key: value
+        key1: value1
+    spec: # Описание Pod
+      containers: # Описание контейнеров внутри Pod
+        - name: web # Название контейнера
+          image: dimpon/dimpon-test-repo:2.0
+          readinessProbe:
+            httpGet:
+              path: /index.html
+              port: 8000
+          livenessProbe:
+            tcpSocket:
+              port: 8000
+          volumeMounts:
+            - name: app
+              mountPath: /app
+      initContainers:
+        - name: init-web-pod
+          image: busybox:1.31.0
+          command: ['sh', '-c', 'wget -O- https://tinyurl.com/otus-k8s-intro | sh']
+          volumeMounts:
+            - name: app
+              mountPath: /app
+      volumes:
+        - name: app
+          emptyDir: {}
