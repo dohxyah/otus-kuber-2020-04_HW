@@ -2,6 +2,96 @@
 # ДЗ по курсу "Инфраструктурная платформа на основе Kubernetes"
 dimpon Platform repository
 
+# Выполнено ДЗ №5
+
+ - [ ] Основное ДЗ: Создать StatefulSet c - локальным S3 хранилищем
+ - [ ] Задание со *: Повторить то же самое, но положить логин/пароль в Secret
+
+## В процессе сделано:
+ - StatefulSet развернут
+ - StatefulSet развернут с логин/пароль в Secret
+
+## Как запустить проект:
+ - запустить manifests
+    - miniostatefulset.yaml
+    - minio-headlessservice.yaml
+ - запустить для *
+    - secrets.yaml
+    - miniostatefulset-secured.yaml
+
+## Как проверить работоспособность:
+подключиться к ноде Kind, 10.244.3.5:9000 - Endpoint
+```textmate
+root@kind-worker2:/# curl http://10.244.3.6:9000
+<?xml version="1.0" encoding="UTF-8"?>
+<Error><Code>AccessDenied</Code><Message>Access Denied.</Message><Resource>/</Resource><RequestId>1617A54AAE7FAC81</RequestId><HostId>6ca6aa5c-906b-48e7-8eaa-e343f83715ac</HostId></Error>root@kind-worker2:/#
+
+
+mc config host add mssminio http://10.244.3.5:9000 minio minio123
+
+root@kind-worker2:/usr/mc# ./mc mb bucket ssminio
+Bucket created successfully `bucket`.
+Bucket created successfully `ssminio`.
+
+root@kind-worker2:/usr/mc# ./mc stat ssminio
+Name      : ssminio/
+Date      : 2020-06-12 00:14:05 UTC
+Size      : 4.0 KiB
+Type      : folder
+Metadata  :
+  Content-Type       : application/octet-stream
+  X-Amz-Meta-Mc-Attrs: atime:1591920848/ctime:1591920845/gid:0/gname:root/mode:16877/mtime:1591920845/uid:0/uname:root
+
+```
+Secrets:
+```textmate
+echo -n 'minio' | base64
+bWluaW8=
+
+echo -n 'minio123' | base64
+bWluaW8xMjM=
+
+# пересоздать StatefulSet
+
+$ kubectl logs pod/minio-0
+Endpoint:  http://10.244.3.6:9000  http://127.0.0.1:9000
+
+Browser Access:
+   http://10.244.3.6:9000  http://127.0.0.1:9000
+
+Object API (Amazon S3 compatible):
+   Go:         https://docs.min.io/docs/golang-client-quickstart-guide
+   Java:       https://docs.min.io/docs/java-client-quickstart-guide
+   Python:     https://docs.min.io/docs/python-client-quickstart-guide
+   JavaScript: https://docs.min.io/docs/javascript-client-quickstart-guide
+   .NET:       https://docs.min.io/docs/dotnet-client-quickstart-guide
+
+#подключиться к minio
+
+root@kind-worker2:/usr/mc# ./mc mb xxx  ssminio
+Bucket created successfully `xxx`.
+Bucket created successfully `ssminio`.
+root@kind-worker2:/usr/mc# ./mc mb ls  ssminio
+Bucket created successfully `ls`.
+Bucket created successfully `ssminio`.
+
+#проверить логин/пароль в контейнере minio
+
+dimpo@DESKTOP-SN07QBO MINGW64 /d/projects/k8s_study/dimpon_platform/kubernetes-volumes (kubernetes-volumes)
+$ kubectl exec -it minio-0 -- sh
+/ #
+/ # echo $MINIO_ACCESS_KEY
+minio
+/ # echo $MINIO_SECRET_KEY
+minio123
+/ #
+
+```
+
+## PR checklist:
+ - [ ] Выставлен label с темой домашнего задания
+
+
 # Выполнено ДЗ № 3
 
  - [ ] Основное ДЗ. Coздать ServiceAccounts, в рамках namespace, назначить различные роли
