@@ -1,0 +1,11 @@
+namePrefix: prod-
+namespace: hipster-shop-prod
+commonLabels:
+  variant: prod
+  org: prod
+commonAnnotations:
+  note: Hello, I am prod!
+bases:
+  - ../../base
+patchesStrategicMerge:
+  - deployment.yaml

@@ -1,0 +1,18 @@
+expose:
+  type: ingress
+  tls:
+    enabled: true
+    secretName: "core-tls"
+    notarySecretName: "notary-tls"
+    commonName: ""
+  ingress:
+    hosts:
+      core:  harbor.34.78.246.165.nip.io
+      notary: notary.34.78.246.165.nip.io
+    controller: default
+    annotations:
+      ingress.kubernetes.io/ssl-redirect: "true"
+      ingress.kubernetes.io/proxy-body-size: "0"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+      cert-manager.io/cluster-issuer: "letsencrypt-production"
