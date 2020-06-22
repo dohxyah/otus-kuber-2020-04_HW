@@ -1,0 +1,11 @@
+namePrefix: staging-
+namespace: hipster-shop
+commonLabels:
+  variant: staging
+  org: staging
+commonAnnotations:
+  note: Hello, I am staging!
+bases:
+  - ../../base
+patchesStrategicMerge:
+  - deployment.yaml

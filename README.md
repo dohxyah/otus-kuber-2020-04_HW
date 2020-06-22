@@ -2,7 +2,119 @@
 # ДЗ по курсу "Инфраструктурная платформа на основе Kubernetes"
 dimpon Platform repository
 
+# Выполнено ДЗ № 6
 
+ - [ ] Основное ДЗ:
+      * Создать кластер на GCP,  настроить клиента
+      *  Используя готовые Helm charts установить:
+            * nginx-ingress
+            * cert-manager
+            * chartmuseum
+            * harbor
+      * Создать свой helm chart, задеплоить hipster-shop
+      * Работа с helm-secrets | Необязательное задание
+      * Kubecfg
+      * Kustomize
+
+ 
+
+## В процессе сделано:
+ - Создан кластер на GCP,  настроен клиент
+ - установлен harbor 3
+ - установлены 
+   * nginx-ingress
+   * cert-manager (дополнительно создан ClusterIssuer)
+   * chartmuseum [screen](./screens/chartmuseum.png) 
+   * harbor  [screen](./screens/harbor.png)
+```text
+kubectl create ns nginx-ingress
+helm upgrade --install nginx-ingress stable/nginx-ingress --wait --namespace=nginx-ingress --version=1.11.1
+
+kubectl create ns cert-manager
+helm install cert-manager jetstack/cert-manager --namespace cert-manager --version v0.15.1 --set installCRDs=true
+
+kubectl apply -f cluster-issuer.yaml
+
+kubectl create ns chartmuseum
+helm upgrade --install chartmuseum stable/chartmuseum --wait --namespace=chartmuseum --version=2.3.2 -f kubernetes-templating/chartmuseum/values.yaml
+
+helm install 1.1.2 harbor/harbor
+kubectl create ns harbor
+helm upgrade --install harbor harbor/harbor --wait --namespace=harbor --version=1.1.2 -f values.yaml
+```
+ - задание с (*)   
+ ```text
+* как работаь с chartmuseum.
+chartmuseum предоствляет REST API
+
+делаем tgz
+helm package .
+
+заливаем на chartmuseum
+curl --data-binary "@mychart-0.1.0.tgz" https://chartmuseum.34.78.246.165.nip.io/api/charts
+
+смотрим
+curl https://chartmuseum.34.78.246.165.nip.io/api/charts
+
+добавляем repo в локальный helm
+helm repo add chartmuseum https://chartmuseum.34.78.246.165.nip.io
+```
+
+ - создан helm chart с all-hipster-shop.yaml
+ - frontend вынесен в отдельный all-hipster-shop.yaml, создан Ingress (https://shop.34.78.246.165.nip.io/)
+ - helm chart с frontend шаблонизирован, добавлен как dependency в Chart.yaml
+ - задание с (*)  создан helm chart с redis, шаблонизирован, добавлен как dependency в requirements.yaml
+ - Работа с helm-secrets пропущена
+ - paymentservice и shippingservice шаблонизированы с помощью Kubecfg
+ - recommendationservice шаблонизированы с помощью Kustomize
+
+  
+## Как запустить проект:
+```text
+kubectl create ns nginx-ingress
+helm upgrade --install nginx-ingress stable/nginx-ingress --wait --namespace=nginx-ingress --version=1.11.1
+
+kubectl create ns cert-manager
+helm install cert-manager jetstack/cert-manager --namespace cert-manager --version v0.15.1 --set installCRDs=true
+
+kubectl apply -f cluster-issuer.yaml
+
+kubectl create ns chartmuseum
+helm upgrade --install chartmuseum stable/chartmuseum --wait --namespace=chartmuseum --version=2.3.2 -f kubernetes-templating/chartmuseum/values.yaml
+
+helm install 1.1.2 harbor/harbor
+kubectl create ns harbor
+helm upgrade --install harbor harbor/harbor --wait --namespace=harbor --version=1.1.2 -f values.yaml
+
+kubectl create ns hipster-shop
+helm upgrade --install hipster-shop kubernetes-templating/hipster-shop --namespace hipster-shop
+helm upgrade --install frontend kubernetes-templating/frontend --namespace hipster-shop
+helm delete frontend -n hipster-shop
+helm dep update kubernetes-templating/hipster-shop
+
+* вынесем redis и пропишем в requirements.yaml
+helm create kubernetes-templating/redis
+helm upgrade --install redis kubernetes-templating/redis --namespace hipster-shop
+
+kubecfg show services.jsonnet
+
+kustomize build ./overrides/hipster-shop >staging.yaml
+kustomize build ./overrides/hipster-shop-prod/ >prod.yaml
+```
+
+## Как проверить работоспособность:
+ - https://chartmuseum.34.78.246.165.nip.io/
+ - https://harbor.34.78.246.165.nip.io/
+ - http://shop.34.78.246.165.nip.io/
+ ```text
+kubecfg show services.jsonnet
+
+kustomize build ./overrides/hipster-shop >staging.yaml
+kustomize build ./overrides/hipster-shop-prod/ >prod.yaml
+```
+
+## PR checklist:
+ - [ ] Выставлен label с темой домашнего задания
 
 
 # Выполнено ДЗ №5
