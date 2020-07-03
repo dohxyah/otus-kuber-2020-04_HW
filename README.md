@@ -2,6 +2,97 @@
 # ДЗ по курсу "Инфраструктурная платформа на основе Kubernetes"
 dimpon Platform repository
 
+
+# Выполнено ДЗ № 7
+
+ - [ ] Основное ДЗ создать CRD,починить валидацию, и написать оператор на Python
+ - [ ] Задание со * настроить status subresource, написать ф-ю обаботки изменеий ````@kopf.on.update('otus.homework', 'v1', 'mysqls')
+                                                    def update_fn(spec, status, namespace, logger, **kwargs):````
+
+## В процессе сделано:
+ - Создан CRD, создан ресурс, написан оператор, делан Docker image, оператор задеплоен как Pod
+ 
+
+## Как запустить проект:
+ - Запустить push.sh, затем применить манифесты.
+
+## Как проверить работоспособность:
+``` 
+$ kubectl api-resources | grep mysql
+mysqls                            ms           otus.homework                  true         MySQL
+
+$ kubectl get ms
+NAME             AGE
+mysql-instance   18h
+
+$ kubectl get pvc
+NAME                        STATUS   VOLUME                     CAPACITY   ACCESS MODES   STORAGECLASS            AGE
+backup-mysql-instance-pvc   Bound    backup-mysql-instance-pv   1Gi        RWO            backup-mysql-instance   13s
+mysql-instance-pvc          Bound    mysql-instance-pv          1Gi        RWO            mysql-instance          13s
+
+$ kubectl get all
+NAME                                   READY   STATUS             RESTARTS   AGE
+pod/mysql-instance-f5b97ffff-q8jfk     1/1     Running            0          2m26s
+pod/restore-mysql-instance-job-dw244   0/1     CrashLoopBackOff   4          2m25s
+
+NAME                     TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)    AGE
+service/kubernetes       ClusterIP   10.96.0.1    <none>        443/TCP    25h
+service/mysql-instance   ClusterIP   None         <none>        3306/TCP   2m26s
+
+NAME                             READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/mysql-instance   1/1     1            1           2m26s
+
+NAME                                       DESIRED   CURRENT   READY   AGE
+replicaset.apps/mysql-instance-f5b97ffff   1         1         1       2m26s
+
+NAME                                   COMPLETIONS   DURATION   AGE
+job.batch/restore-mysql-instance-job   0/1           2m25s      2m25s
+
+база аботает
+
+$ kubectl exec -it $MYSQLPOD -- mysql -potuspassword -e "select * from test;" otus-database
+mysql: [Warning] Using a password on the command line interface can be insecure.
++----+-------------+
+| id | name        |
++----+-------------+
+|  1 | some data   |
+|  2 | some data-2 |
++----+-------------+
+
+mysql удалили, создали - база жива
+
+$ kubectl exec -it $MYSQLPOD -- mysql -potuspassword -e "select * from test;" otus-database
+mysql: [Warning] Using a password on the command line interface can be insecure.
++----+-------------+
+| id | name        |
++----+-------------+
+|  1 | some data   |
+|  2 | some data-2 |
++----+-------------+
+
+создаем Docker image push.sh, прогоняем манийесты, повторяем проверку базы
+
+dimpo@DESKTOP-SN07QBO MINGW64 /d/projects/k8s_study/dimpon_platform/kubernetes-operators/deploy (kubernetes-operators)
+$ kubectl exec -it $MYSQLPOD -- mysql -potuspassword -e "select * from test;" otus-database
+mysql: [Warning] Using a password on the command line interface can be insecure.
++----+-------------+
+| id | name        |
++----+-------------+
+|  1 | some data   |
+|  2 | some data-2 |
++----+-------------+
+
+$ kubectl get jobs
+NAME                         COMPLETIONS   DURATION   AGE
+backup-mysql-instance-job    1/1           2s         5m25s
+restore-mysql-instance-job   1/1           53s        4m11s
+```
+
+## PR checklist:
+ - [ ] Выставлен label с темой домашнего задания
+
+
+
 # Выполнено ДЗ № 6
 
  - [ ] Основное ДЗ:
