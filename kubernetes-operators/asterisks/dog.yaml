@@ -1,0 +1,9 @@
+apiVersion: "example.dimpon.com/v1"
+kind: Dog
+metadata:
+  name: polkan
+spec:
+  #owner: "Vasya Petrov"
+  owner: "John Dou"
+status:
+  message: Created

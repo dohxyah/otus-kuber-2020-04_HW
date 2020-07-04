@@ -4,8 +4,6 @@ metadata:
   name: mysqls.otus.homework # имя CRD должно иметь формат plural.group
 spec:
   scope: Namespaced     # Данный CRD будет работать в рамках namespace
-  subresources:
-    status: {}
   group: otus.homework  # Группа, отражается в поле apiVersion CR
   versions:             # Список версий
     - name: v1

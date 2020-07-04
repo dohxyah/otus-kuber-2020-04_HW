@@ -5,6 +5,20 @@ import time
 from jinja2 import Environment, FileSystemLoader
 import logging
 
+# ждем завершения Job
+def wait_until_job_end(jobname):
+    api = kubernetes.client.BatchV1Api()
+    job_finished = False
+    jobs = api.list_namespaced_job('default')
+    while (not job_finished) and \
+            any(job.metadata.name == jobname for job in jobs.items):
+        time.sleep(1)
+        jobs = api.list_namespaced_job('default')
+        for job in jobs.items:
+            if job.metadata.name == jobname:
+                if job.status.succeeded == 1:
+                    job_finished = True
+
 def render_template(filename, vars_dict):
     env = Environment(loader=FileSystemLoader('./templates'))
     template = env.get_template(filename)
@@ -23,25 +37,13 @@ def delete_success_jobs(mysql_instance_name):
             if job.status.succeeded == 1:
                 api.delete_namespaced_job(jobname, 'default', propagation_policy='Background')
 
-# ждем завершения Job
-def wait_until_job_end(jobname):
-    api = kubernetes.client.BatchV1Api()
-    job_finished = False
-    jobs = api.list_namespaced_job('default')
-    while (not job_finished) and \
-            any(job.metadata.name == jobname for job in jobs.items):
-        time.sleep(1)
-        jobs = api.list_namespaced_job('default')
-        for job in jobs.items:
-            if job.metadata.name == jobname:
-                if job.status.succeeded == 1:
-                    job_finished = True
+
 
 # Функция, которая будет запускаться при создании объектов тип MySQL:
 @kopf.on.create('otus.homework', 'v1', 'mysqls')
 def mysql_on_create(body, spec, **kwargs):
     logging.info("Mysql is creating...")
-    logging.info(body)
+    logging.debug(body)
 
     # cохраняем в переменные содержимое описания MySQL из CR
     name = body['metadata']['name']
@@ -53,7 +55,7 @@ def mysql_on_create(body, spec, **kwargs):
     # Генерируем JSON манифесты для деплоя
     logging.info("Generating manifests...")
     persistent_volume = render_template('mysql-pv.yml.j2', {'name': name, 'storage_size': storage_size})
-    persistent_volume_claim = render_template('mysql-pvc.yml.j2', {'name': name,'storage_size': storage_size})
+    persistent_volume_claim = render_template('mysql-pvc.yml.j2', {'name': name, 'storage_size': storage_size})
     service = render_template('mysql-service.yml.j2', {'name': name})
     deployment = render_template('mysql-deployment.yml.j2', {
         'name': name,
@@ -66,12 +68,12 @@ def mysql_on_create(body, spec, **kwargs):
         'password': password,
         'database': database})
 
-    logging.info("manifests:")
-    logging.info(persistent_volume)
-    logging.info(persistent_volume_claim)
-    logging.info(service)
-    logging.info(deployment)
-    logging.info(restore_job)
+    logging.debug("manifests:")
+    logging.debug(persistent_volume)
+    logging.debug(persistent_volume_claim)
+    logging.debug(service)
+    logging.debug(deployment)
+    logging.debug(restore_job)
 
     # Определяем, что созданные ресурсы являются дочерними к управляемому CustomResource:
     logging.info("Set resources dependant from mysql...")
@@ -79,7 +81,6 @@ def mysql_on_create(body, spec, **kwargs):
     kopf.append_owner_reference(persistent_volume_claim, owner=body)
     kopf.append_owner_reference(service, owner=body)
     kopf.append_owner_reference(deployment, owner=body)
-    kopf.append_owner_reference(restore_job, owner=body)
     # ^ Таким образом при удалении CR удалятся все, связанные с ним pv,pvc,svc, deployments
 
 
@@ -96,8 +97,6 @@ def mysql_on_create(body, spec, **kwargs):
     api.create_namespaced_deployment('default', deployment)
 
     message = name + " Deployment is created"
-
-
 
     try:
         backup_pv = render_template('backup-pv.yml.j2', {'name': name})
@@ -155,5 +154,8 @@ def delete_object_make_backup(body, **kwargs):
     return {'message': "mysql and its children resources deleted"}
 
 
-#@kopf.on.update('otus.homework', 'v1', 'mysqls')
-#def update_object(body, **kwargs):
+@kopf.on.update('otus.homework', 'v1', 'mysqls')
+def update_object(body, **kwargs):
+    logging.info("update "+body)
+    return {'message': "mysql updated"}
+
