@@ -2,6 +2,167 @@
 # ДЗ по курсу "Инфраструктурная платформа на основе Kubernetes"
 dimpon Platform repository
 
+
+# Выполнено ДЗ № 7
+
+ - [ ] Основное ДЗ создать CRD,починить валидацию, и написать оператор на Python, сделать Docker image, задерлоить как Deployment
+ - [ ] Задание со * настроить status subresource, написать ф-ю обработки изменений 
+
+## В процессе сделано:
+ - Создан CRD, создан ресурс, написан оператор, делан Docker image, оператор задеплоен как Pod
+ - Выполнены задания с *
+ 
+
+## Как запустить проект:
+ - Запустить [build/push.sh](kubernetes-operators/build/push.sh), затем применить манифесты из deploy.
+    - role.yml
+    - role-binding.yml
+    - service-account.yml
+    - deploy-operator.yml
+    - crd.yml
+    - cr.yml
+ - Проверить базу :
+```
+export MYSQLPOD=$(kubectl get pods -l app=mysql-instance -o jsonpath="{.items[*].metadata.name}")
+kubectl exec -it $MYSQLPOD -- mysql -u root -potuspassword -e "CREATE TABLE test (id smallint unsigned not null auto_increment, name varchar(20) not null, constraint pk_example primary key (id) );" otus-database
+kubectl exec -it $MYSQLPOD -- mysql -potuspassword -e "INSERT INTO test ( id, name) VALUES ( null, 'some data' );" otus-database
+kubectl exec -it $MYSQLPOD -- mysql -potuspassword -e "INSERT INTO test ( id, name ) VALUES ( null, 'some data-2' );" otus-database
+
+kubectl exec -it $MYSQLPOD -- mysql -potuspassword -e "select * from test;" otus-database
+```
+
+## Как проверить работоспособность:
+``` 
+$ kubectl api-resources | grep mysql
+mysqls                            ms           otus.homework                  true         MySQL
+
+$ kubectl get ms
+NAME             AGE
+mysql-instance   18h
+
+$ kubectl get pvc
+NAME                        STATUS   VOLUME                     CAPACITY   ACCESS MODES   STORAGECLASS            AGE
+backup-mysql-instance-pvc   Bound    backup-mysql-instance-pv   1Gi        RWO            backup-mysql-instance   13s
+mysql-instance-pvc          Bound    mysql-instance-pv          1Gi        RWO            mysql-instance          13s
+
+$ kubectl get all
+NAME                                   READY   STATUS             RESTARTS   AGE
+pod/mysql-instance-f5b97ffff-q8jfk     1/1     Running            0          2m26s
+pod/restore-mysql-instance-job-dw244   0/1     CrashLoopBackOff   4          2m25s
+
+NAME                     TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)    AGE
+service/kubernetes       ClusterIP   10.96.0.1    <none>        443/TCP    25h
+service/mysql-instance   ClusterIP   None         <none>        3306/TCP   2m26s
+
+NAME                             READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/mysql-instance   1/1     1            1           2m26s
+
+NAME                                       DESIRED   CURRENT   READY   AGE
+replicaset.apps/mysql-instance-f5b97ffff   1         1         1       2m26s
+
+NAME                                   COMPLETIONS   DURATION   AGE
+job.batch/restore-mysql-instance-job   0/1           2m25s      2m25s
+```
+база работает:
+```
+$ kubectl exec -it $MYSQLPOD -- mysql -potuspassword -e "select * from test;" otus-database
+mysql: [Warning] Using a password on the command line interface can be insecure.
++----+-------------+
+| id | name        |
++----+-------------+
+|  1 | some data   |
+|  2 | some data-2 |
++----+-------------+
+```
+ресурс mysql удалили, создали - база жива
+```
+$ kubectl exec -it $MYSQLPOD -- mysql -potuspassword -e "select * from test;" otus-database
+mysql: [Warning] Using a password on the command line interface can be insecure.
++----+-------------+
+| id | name        |
++----+-------------+
+|  1 | some data   |
+|  2 | some data-2 |
++----+-------------+
+```
+создаем Docker image push.sh, прогоняем манифесты, повторяем проверку базы - жива
+```
+dimpo@DESKTOP-SN07QBO MINGW64 /d/projects/k8s_study/dimpon_platform/kubernetes-operators/deploy (kubernetes-operators)
+$ kubectl exec -it $MYSQLPOD -- mysql -potuspassword -e "select * from test;" otus-database
+mysql: [Warning] Using a password on the command line interface can be insecure.
++----+-------------+
+| id | name        |
++----+-------------+
+|  1 | some data   |
+|  2 | some data-2 |
++----+-------------+
+
+$ kubectl get jobs
+NAME                         COMPLETIONS   DURATION   AGE
+backup-mysql-instance-job    1/1           2s         5m25s
+restore-mysql-instance-job   1/1           53s        4m11s
+```
+
+##Задание со * 
+манифесты и оператор в папке [asterisks](kubernetes-operators/asterisks). (mysql решил не трогать, тк мои прошлые оптимизации оператора привели к поломке travis)
+Чтобы начать писать в subresources status достаточно в CRD manifest добавить:
+```yaml
+  subresources:
+    status: {}
+```
+а в ф-ях Kopf возвращать значение:
+```python
+@kopf.on.create('example.dimpon.com', 'v1', 'dogs')
+def dog_on_create(spec, name, status, namespace, logger, **kwargs):
+    logger.info("dog is creating... name:%s spec:%s  status:%s namespace:%s ", name, spec, status, namespace)
+    message = name + " dog is owned by " + spec['owner']
+    return {'message': message}
+```
+тогда:
+```yaml
+$ kubectl get dogs polkan -o yaml
+apiVersion: example.dimpon.com/v1
+kind: Dog
+metadata:
+  name: polkan
+  namespace: default
+  resourceVersion: "21504"
+:
+:
+:
+spec:
+  owner: John Dou
+status:
+  dog_on_create:
+    message: polkan dog is owned by Vasya Petrov
+  dog_on_update:
+    message: polkan dog is owned by John Dou
+
+```
+чтобы перхватывать обновление ресурса делаем новый метод:
+```python
+@kopf.on.update('example.dimpon.com', 'v1', 'dogs')
+def dog_on_update(spec, name, status, namespace, logger, **kwargs):
+    logger.info("dog is updating... name:%s spec:%s  status:%s namespace:%s ", name, spec, status, namespace)
+    message = name + " dog is owned by " + spec['owner']
+    return {'message': message}
+```
+в нем есть вся необходимая информация для пересоздания deployment и других ресурсов. Если взять наше исходное задание, то легко пересоздать deployment с новым паролем или именем базы. 
+лог оператора:
+```text
+[2020-07-04 19:50:41,714] kopf.objects         [INFO    ] [default/polkan] dog is creating... name:polkan spec:{'owner': 'Vasya Petrov'}  status:{} namespace:default
+[2020-07-04 19:50:41,719] kopf.objects         [INFO    ] [default/polkan] Handler 'dog_on_create' succeeded.
+[2020-07-04 19:50:41,720] kopf.objects         [INFO    ] [default/polkan] All handlers succeeded for creation.
+[2020-07-04 19:51:30,485] kopf.objects         [INFO    ] [default/polkan] dog is updating... name:polkan spec:{'owner': 'John Dou'}  status:{'dog_on_create': {'message': 'polkan dog is owned by Vasya Petrov'}} namespace:default
+[2020-07-04 19:51:30,491] kopf.objects         [INFO    ] [default/polkan] Handler 'dog_on_update' succeeded.
+[2020-07-04 19:51:30,495] kopf.objects         [INFO    ] [default/polkan] All handlers succeeded for update.
+```
+
+## PR checklist:
+ - [ ] Выставлен label с темой домашнего задания
+
+
+
 # Выполнено ДЗ № 6
 
  - [ ] Основное ДЗ:
