@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-with-metrics
+  labels:
+    app: nginx-with-metrics
+spec:
+  selector:
+    matchLabels:
+      app: nginx-with-metrics
+
+  replicas: 3
+  template:
+    metadata:
+      name: nginx-with-metrics
+      labels:
+        app: nginx-with-metrics
+    spec:
+      containers:
+        - name: nginx-with-metrics
+          image: dimpon/nginx-with-metrics:1.0
+          ports:
+            - name: web
+              containerPort: 80
+              protocol: TCP
+          readinessProbe:
+            initialDelaySeconds: 10
+            httpGet:
+              path: /index.html
+              port: 80
+        - name: exporter
+          image: nginx/nginx-prometheus-exporter:0.7.0
+          ports:
+            - name: metrics
+              containerPort: 9113
+              protocol: TCP
+          args: ['-nginx.scrape-uri', 'http://127.0.0.1:80/basic_status']
+

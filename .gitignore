@@ -21,3 +21,7 @@ files/
 # Binary classes
 bin/
 .factorypath
+
+# pycache
+# pycache/
+#__pycache__/

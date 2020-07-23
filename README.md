@@ -2,6 +2,70 @@
 # ДЗ по курсу "Инфраструктурная платформа на основе Kubernetes"
 dimpon Platform repository
 
+# Выполнено ДЗ № 8
+ - [ ] Основное ДЗ
+
+## В процессе сделано:
+ - Установлен Prometheus Operator чезез Helm 3
+ - Создан Deployment c 3 репликами nginx + nginx exporter
+ - Проверено, что метрики видны в Prometheus и Grafana 
+
+## Как запустить проект:
+ - Использовался Kind c 3мя нодами.
+ - готовим nginx-with-metrics
+   - собираем образ nginx с включенным ngx_http_stub_status_module.  (./nginx/push.sh)
+   - деплоим в docker hub, проверяем:
+   - ``docker run -p 80:80 dimpon/nginx-with-metrics:1.0``
+   - статистика должна быть доступна по http://localhost/basic_status
+ - создаем манифесты для deployment, service, service-monitor
+ - Prometheus Operator
+   - ``cd prometheus``
+   - ``crd.sh`` //создаем CRD
+   - деплоим через Helm 3, используем кастомный values.yaml
+   ```
+     helm repo add stable https://kubernetes-charts.storage.googleapis.com
+     kubectl create ns monitoring
+     helm upgrade --install prometheus-monitor stable/prometheus-operator -n monitoring -f values.yaml --set prometheusOperator.createCustomResources=false
+     ```
+    - прверяем:
+    ```
+     kubectl port-forward prometheus-monitor-grafana-54b6699f56-hb7nf  -n monitoring 3000:3000
+     kubectl port-forward prometheus-prometheus-monitor-prometh-prometheus-0 -n monitoring 9090:9090
+   ```
+  - деплоим nginx-with-metrics: ``deploy.sh``
+   - заходим на одну из нод:
+     ``docker exec -it <container> bash``
+     дергаем несколько раз nginx:
+     ```
+     root@kind-worker:/# curl http://10.111.238.58
+     <!DOCTYPE html>
+     <html lang="en">
+     <head>
+         <meta charset="UTF-8">
+         <title>Title</title>
+     </head>
+     <body>
+     Hello, that is nginx http endpoint. I'm alive.
+     </body>
+     </html>
+     ```
+     
+     - install goldpinger
+       ``helm upgrade --install goldpinger stable/goldpinger``
+     - проверяем в Prometheus и Grafana и Goldpinger:
+        * [prometheus.PNG](./kubernetes-monitoring/screenshots/prometheus.PNG) 
+        * [grafana.PNG](./kubernetes-monitoring/screenshots/grafana.PNG)
+        * [goldpinger.PNG](./kubernetes-monitoring/screenshots/goldpinger.PNG)
+     
+
+## Как проверить работоспособность:
+ - kubectl port-forward prometheus-monitor-grafana-54b6699f56-hb7nf -n monitoring 3000:3000
+ - kubectl port-forward prometheus-prometheus-monitor-prometh-prometheus-0 -n monitoring 9090:9090
+ - open [Prometheus](http://localhost:9090/graph?g0.range_input=1h&g0.expr=rate(nginx_http_requests_total%5B1m%5D)&g0.tab=0)
+ - open [Grafana](http://localhost:3000/explore?orgId=1&left=%5B%22now-1h%22,%22now%22,%22Prometheus%22,%7B%22expr%22:%22rate(nginx_http_requests_total%5B1m%5D)%22%7D,%7B%22mode%22:%22Metrics%22%7D,%7B%22ui%22:%5Btrue,true,true,%22none%22%5D%7D%5D)
+
+## PR checklist:
+ - [ ] Выставлен label с темой домашнего задания
 
 # Выполнено ДЗ № 7
 
