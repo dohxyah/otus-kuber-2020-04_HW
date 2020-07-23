@@ -28,6 +28,13 @@ spec:
             httpGet:
               path: /index.html
               port: 80
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "150m"
+            limits:
+              memory: "128Mi"
+              cpu: "250m"
         - name: exporter
           image: nginx/nginx-prometheus-exporter:0.7.0
           ports:
@@ -35,4 +42,11 @@ spec:
               containerPort: 9113
               protocol: TCP
           args: ['-nginx.scrape-uri', 'http://127.0.0.1:80/basic_status']
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "150m"
+            limits:
+              memory: "64Mi"
+              cpu: "250m"
 
