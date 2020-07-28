@@ -2,6 +2,72 @@
 # ДЗ по курсу "Инфраструктурная платформа на основе Kubernetes"
 dimpon Platform repository
 
+
+
+# Выполнено ДЗ № 9
+
+ - [ ] Основное ДЗ
+ 
+
+## В процессе сделано:
+ - Создан GKE кластер, 4 ноды.
+ ```text
+   $ kubectl get nodes
+   NAME                                             STATUS   ROLES    AGE   VERSION
+   gke-cluster-logging-default-pool-2baa7f86-fqmb   Ready    <none>   27h   v1.15.9-gke.24
+   gke-cluster-logging-infra-pool-94a26708-1xdq     Ready    <none>   27h   v1.15.9-gke.24
+   gke-cluster-logging-infra-pool-94a26708-gcpw     Ready    <none>   27h   v1.15.9-gke.24
+   gke-cluster-logging-infra-pool-94a26708-rhvx     Ready    <none>   27h   v1.15.9-gke.24
+```
+ - на кластере отключен Stackdriver, для нод infra-pool выставлен taint
+ ```text
+kubectl taint nodes gke-cluster-logging-infra-pool-94a26708-1xdq node-role=infra:NoSchedule
+kubectl taint nodes gke-cluster-logging-infra-pool-94a26708-gcpw node-role=infra:NoSchedule
+kubectl taint nodes gke-cluster-logging-infra-pool-94a26708-rhvx node-role=infra:NoSchedule
+```
+ - Устанавливаем Hipster Shop на default-pool ноду
+ - Устанавливаем elasticsearch, kibana, fluent-bit, в манифестах указываем tolerations
+```text
+helm upgrade --install elasticsearch elastic/elasticsearch --namespace observability -f elasticsearch.values.yaml
+helm upgrade --install kibana elastic/kibana --namespace observability -f kibana.values.yaml
+helm upgrade --install fluent-bit stable/fluent-bit --namespace observability -f fluent-bit.values.yaml
+```
+ - устанавливаем nginx-ingress controller
+ ```text
+kubectl create ns nginx-ingress
+helm upgrade --install nginx-ingress stable/nginx-ingress --wait --namespace=nginx-ingress --version=1.11.1 -f ingress.values.yaml
+```
+- обновляем kibana, смотрим http://kibana.35.193.244.77.xip.io/app/kibana#/home
+- чиним fluent-bit (time и timestamp), чиним логи от nginx ingress 
+- ставим Prometheus и Grafana
+```text
+helm upgrade --install prometheus-operator stable/prometheus-operator --set prometheusOperator.createCustomResource=false -f prometheus-operator.values.yaml -n observability
+helm upgrade --install elasticsearch-exporter stable/elasticsearch-exporter --set es.uri=http://elasticsearch-master:9200 --set serviceMonitor.enabled=true --namespace=observability
+```
+- Импортируем Dashboard [grafana_elasticsearch.PNG](./kubernetes-logging/screenshots/grafana_elasticsearch.PNG) 
+- Добавили alert ElasticsearchTooFewNodesRunning 
+- Настраиваем Dashboard в Kibana [dashboard.PNG](./kubernetes-logging/screenshots/dashboard.PNG)
+- Ставим Loki
+```text
+helm repo add loki https://grafana.github.io/loki/charts
+helm repo update
+helm upgrade --install loki loki/loki-stack --namespace observability -f loki.values.yaml
+```
+- Создаем Dashboard [loki.PNG](./kubernetes-logging/screenshots/loki.PNG)
+
+## Как запустить проект:
+ - выполнить helm charts
+
+## Как проверить работоспособность:
+ - http://kibana.35.193.244.77.xip.io/
+ - http://prometheus.35.193.244.77.xip.io/
+ - http://grafana.35.193.244.77.xip.io/
+
+## PR checklist:
+ - [ ] Выставлен label с темой домашнего задания
+
+
+
 # Выполнено ДЗ № 8
  - [ ] Основное ДЗ
 
