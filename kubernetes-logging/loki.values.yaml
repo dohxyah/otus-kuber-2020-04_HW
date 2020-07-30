@@ -1,0 +1,9 @@
+loki:
+  enabled: true
+
+promtail:
+  enabled: true
+  tolerations:
+    - key: node-role
+      operator: Exists
+      effect: NoSchedule
