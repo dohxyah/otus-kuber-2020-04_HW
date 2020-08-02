@@ -1,0 +1,17 @@
+server:
+  standalone:
+    enabled: false
+  ha:
+    enabled: true
+
+  ingress:
+    enabled: true
+    annotations:
+      kubernetes.io/ingress.class: nginx
+
+    hosts:
+      - host: vault.34.90.132.76.xip.io
+        path: ["/"]
+ui:
+  enabled: true
+  serviceType: "ClusterIP"
