@@ -1,0 +1,23 @@
+[ req ]
+default_bits = 2048
+prompt = no
+default_md = sha256
+distinguished_name = dn
+req_extensions = v3_ext
+[ dn ]
+commonName = localhost
+stateOrProvinceName = Frankfurt
+countryName = DE
+emailAddress = dimpon@gmail.com
+organizationName = OTUS
+organizationalUnitName = Development
+[ v3_ext ]
+basicConstraints = CA:FALSE
+keyUsage = keyEncipherment,dataEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+[alt_names]
+DNS.0 = localhost
+DNS.1 = vault
+DNS.2 = vault.34.90.132.76.xip.io
+
