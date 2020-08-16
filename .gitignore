@@ -15,6 +15,9 @@
 log/
 target/
 
+# Gradle
+.gradle
+
 # Experiments
 files/
 
