@@ -2,6 +2,30 @@
 # ДЗ по курсу "Инфраструктурная платформа на основе Kubernetes"
 dimpon Platform repository
 
+
+# Выполнено ДЗ № 11
+
+ - [ ] установить flux, настроить деплой приложения и обновление через git
+ - [ ] установить flagger, istio. Настроить canary deploy
+
+## В процессе сделано:
+ - создан кластер
+ - установлен flux
+ - создан репозиторий прилодения в git lab, настроен pipeline для сборки и push docker images
+ - настроен автодеплой и обновление манифестов
+ - установлен istio, добавлены sidecrs
+ - установлен flagger, настрооен canary deploy. 
+ - контроль через Grafana
+
+## Как запустить проект:
+ - см readme
+
+## Как проверить работоспособность:
+ - см readme
+
+## PR checklist:
+ - [ ] Выставлен label с темой домашнего задания
+
 # Выполнено ДЗ № 11
 # GitOps
 
@@ -231,7 +255,12 @@ helm upgrade -i flagger-grafana flagger/grafana \
 ```
 пересобираем и пушим frontend image - работает!
 [canary.PNG](./kubernetes-gitops/canary.PNG)
+```text
+$ kubectl get canaries -n microservices-demo
+NAME       STATUS      WEIGHT   LASTTRANSITIONTIME
+frontend   Succeeded   0        2020-08-24T08:01:27Z
 
+```
 ```text
 Events:
   Type     Reason  Age                From     Message
