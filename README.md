@@ -2,6 +2,270 @@
 # ДЗ по курсу "Инфраструктурная платформа на основе Kubernetes"
 dimpon Platform repository
 
+# Выполнено ДЗ № 11
+# GitOps
+
+###Подготовка
+
+Репозиторий с microservices-demo:
+https://gitlab.com/dimpon/microservices-demo
+
+создаем кастер как в лекции по Istio:
+```
+#!/bin/bash
+gcloud container clusters create \
+  --machine-type n1-standard-2 \
+  --num-nodes 4 \
+  --zone europe-west4-a \
+  --cluster-version latest \
+  standart-cluster-1
+```
+проверяем:
+```
+$ gcloud container clusters list
+NAME                LOCATION        MASTER_VERSION  MASTER_IP      MACHINE_TYPE   NODE_VERSION   NUM_NODES  STATUS
+standart-cluster-1  europe-west4-a  1.16.13-gke.1   34.91.188.142  n1-standard-2  1.16.13-gke.1  4          RUNNING
+```
+ставим Istio as addon:
+```
+gcloud beta container clusters update standart-cluster-1 --update-addons=Istio=ENABLED --istio-config=auth=MTLS_PERMISSIVE
+```
+проверяем:
+```
+$ kubectl get pods -n istio-system
+NAME                                             READY   STATUS      RESTARTS   AGE
+istio-citadel-545687f6d-dpx9p                    1/1     Running     0          5m37s
+istio-galley-774d87fcf8-dmv6p                    1/1     Running     0          5m37s
+istio-ingressgateway-5b76747cbf-44t4q            1/1     Running     0          5m37s
+istio-pilot-696f9747d7-c7tvx                     2/2     Running     1          5m36s
+istio-policy-6b4b79789d-hc6sv                    2/2     Running     3          5m35s
+istio-security-post-install-1.4.10-gke.5-wft9m   0/1     Completed   0          5m32s
+istio-sidecar-injector-6cd98c4887-j5wqv          1/1     Running     0          5m35s
+istio-telemetry-546b9b67bf-zz2bj                 2/2     Running     3          5m34s
+promsd-696bcc5b96-dnhq4                          2/2     Running     1          5m34s
+```
+собиоаем docker images, обязательно из той директории где Dockerfile, проверяем:
+https://hub.docker.com/repository/docker/dimpon/frontend
+###GitOps
+Установим CRD, добавляющую в кластер новый ресурс - HelmRelease:
+
+``kubectl apply -f https://raw.githubusercontent.com/fluxcd/helm-operator/master/deploy/crds.yaml``
+
+Добавим официальный репозиторий Flux
+
+``helm repo add fluxcd https://charts.fluxcd.io``
+
+Произведем установку Flux в кластер, в namespace flux
+```
+kubectl create namespace flux
+helm upgrade --install flux fluxcd/flux -f flux.values.yaml --namespace flux
+```
+
+Установим Helm operator:
+```
+helm upgrade --install helm-operator fluxcd/helm-operator -f helm-operator.values.yaml --namespace flux
+```
+
+Установим fluxctl на локальную машину
+``choco install fluxctl``
+
+добавим в свой профиль GitLab публичный ssh-ключ, flux'a
+```text
+$ fluxctl identity --k8s-fwd-ns flux
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDDeiOVZ0nqRYyacaxXmKgNfeFD566LXTiEGoHLzJrtZokDom972W/9aYTaA8HRBYOxv0jtzcKd2hmM7JgrRD0EGFCJnXWxQUdParVIdqDvT3nEm3i9WXz/kx7PmTwYm+cUWZZEJUlF00U+Ghexd8VdzEHA4SDjXpDYnDcbe/RuBRHXRr/O8eyolRaA0I6qxM+NIteMOzFygI1/w8kG3sekSQtnnjxlS2bq9
+c1nseErWwnM2iBN+yMGuskLp38GTcwacIho6oR6BRapaBdbHT68df0+4uCVZMurvQH7NDdVmUOXgYwVwr5F2AX6xh5KDSXW2JUHMUwk97mU5oN7amipwO2Rcttir3Xvnd4lfLlqCo2carJfRWHpkCtXK8yoxpjEBmZtdAnH7y8KLzD2s4i5hVMc4itL3C3bu7hl0NuJSpuDAbmPJZYl+kziNZFmMNqd+NlKJDJx3JGRgjYe1/08DRJbYGbsrjGQfteCL6ncsa
+xXHnQSs5AzuX4JuhqqL6k= root@flux-86794b8dc7-st92q
+```
+
+запушим новый namespace microservices-demo - и вот он в кластере!
+```
+$ kubectl get ns
+NAME                 STATUS   AGE
+default              Active   5h50m
+flux                 Active   30m
+istio-system         Active   4h21m
+kube-node-lease      Active   5h50m
+kube-public          Active   5h50m
+kube-system          Active   5h50m
+microservices-demo   Active   69s
+```
+log
+```text
+ts=2020-08-16T16:22:56.046582281Z caller=sync.go:540 method=Sync cmd=apply args= count=1
+ts=2020-08-16T16:22:56.622646543Z caller=sync.go:606 method=Sync cmd="kubectl apply -f -" took=575.996188ms err=null output="namespace/microservices-demo created"
+ts=2020-08-16T16:22:56.624366314Z caller=daemon.go:701 component=daemon event="Sync: 811d7e6, <cluster>:namespace/microservices-demo" logupstream=false
+```
+```text
+$ kubectl get helmrelease -n microservices-demo
+NAME       RELEASE    PHASE       STATUS     MESSAGE                                                                       AGE
+frontend   frontend   Succeeded   deployed   Release was successful for Helm release 'frontend' in 'microservices-demo'.   46m
+```
+
+```text
+$ kubectl get all -n microservices-demo
+NAME                            READY   STATUS    RESTARTS   AGE
+pod/frontend-6b8b79c478-kvm4m   1/1     Running   0          66s
+
+NAME               TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE
+service/frontend   ClusterIP   10.59.255.20   <none>        80/TCP    18m
+
+NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/frontend   1/1     1            1           18m
+
+NAME                                  DESIRED   CURRENT   READY   AGE
+replicaset.apps/frontend-6b8b79c478   1         1         1       66s
+replicaset.apps/frontend-7c7456c89    0         0         0       18m
+```
+обновим frontend image, сделаем push.
+frontend deployment обновился, обновился также deploy/releases/frontend.yaml, линк на картинку
+[frontendupdated.PNG](./kubernetes-gitops/frontendupdated.PNG)
+
+переименуем deployment - frontend передеплоился
+```
+$  helm history frontend -n microservices-demo
+REVISION        UPDATED                         STATUS          CHART           APP VERSION     DESCRIPTION
+1               Mon Aug 17 22:03:41 2020        superseded      frontend-0.21.0 1.16.0          Install complete
+2               Mon Aug 17 22:21:17 2020        superseded      frontend-0.21.0 1.16.0          Upgrade complete
+3               Mon Aug 17 22:30:22 2020        deployed        frontend-0.21.0 1.16.0          Upgrade complete
+```
+helm-operator log:
+```
+ts=2020-08-17T22:30:22.700124895Z caller=helm.go:69 component=helm version=v3 info="Looks like there are no changes for Service \"frontend\"" targetNamespace=microservices-demo release=frontend
+ts=2020-08-17T22:30:22.710500256Z caller=helm.go:69 component=helm version=v3 info="Created a new Deployment called \"frontend-hipster\" in microservices-demo\n" targetNamespace=microservices-demo release=frontend
+ts=2020-08-17T22:30:22.720065545Z caller=helm.go:69 component=helm version=v3 info="Looks like there are no changes for Gateway \"frontend-gateway\"" targetNamespace=microservices-demo release=frontend
+ts=2020-08-17T22:30:22.736562828Z caller=helm.go:69 component=helm version=v3 info="Looks like there are no changes for VirtualService \"frontend\"" targetNamespace=microservices-demo release=frontend
+ts=2020-08-17T22:30:22.741143991Z caller=helm.go:69 component=helm version=v3 info="Deleting \"frontend\" in microservices-demo..." targetNamespace=microservices-demo release=frontend
+```
+Добаим манифесты HelmRelease для всех микросервисов входящих в состав HipsterShop.
+
+При обновлении Images происхоит редеплой, при обновлении манифестов тоже. Класс!
+
+###Canary deployments с Flagger и Istio
+Istio уже установлен, скачиваем istioctl
+Установка Flagger
+
+Добавление helm-репозитория flagger:
+
+```
+helm repo add flagger https://flagger.app
+```
+Установка CRD для Flagger:
+```
+kubectl apply -f https://raw.githubusercontent.com/weaveworks/flagger/master/artifacts/flagger/crd.yaml
+```
+Установка flagger с указанием использовать Istio:
+```
+helm upgrade --install flagger flagger/flagger --namespace=istio-system --set crd.create=false \
+ --set meshProvider=istio \
+ --set metricsServer=http://prometheus:9090
+```
+Sidecar Injection
+добавим ``istio-injection: enabled`` к namespace  microservices-demo
+проверим:
+```
+$ kubectl get ns microservices-demo --show-labels
+NAME                 STATUS   AGE     LABELS
+microservices-demo   Active   5d23h   fluxcd.io/sync-gc-mark=sha256.E01-msAVm7rQfQ2CdkUMjIEdleNITa295iNRhKeMuxE,istio-injection=enabled
+```
+
+добавим sidecar удалив Pods
+```
+kubectl delete pods --all -n microservices-demo
+```
+После этого можно проверить, что контейнер с названием istioproxy появился внутри каждого pod:
+```
+kubectl describe pod -l app=frontend -n microservices-demo
+```
+VirtualService и Gateway уже были созданы, так как были в helm charts frontend
+```
+$ kubectl get gateway -n microservices-demo
+NAME               AGE
+frontend-gateway   4d17h
+```
+установим Canary добавив canary.yaml в deploy\charts\frontend\templates
+благодяря Flux он задеплоится автоматически
+```
+$ kubectl get canary -n microservices-demo
+NAME       STATUS        WEIGHT   LASTTRANSITIONTIME
+frontend   Initialized   0        2020-08-23T14:16:00Z
+```
+frontend pod обновился:
+```
+$ kubectl get pods -n microservices-demo -l app=frontend-primary
+NAME                                READY   STATUS    RESTARTS   AGE
+frontend-primary-698b698db9-5j6fn   2/2     Running   0          3m47s
+```
+соберем v0.0.3 для frontend
+```text
+kubectl describe canary frontend -n microservices-demo
+
+Events:
+  Type     Reason  Age                From     Message
+  ----     ------  ----               ----     -------
+  Warning  Synced  18m                flagger  frontend-primary.microservices-demo not ready: waiting for rollout to finish: observed deployment generation less then desired generation
+  Warning  Synced  17m (x2 over 18m)  flagger  Error checking metric providers: prometheus not avaiable: running query failed: request failed: Get "http://prometheus:9090/api/v1/query?query=vector%281%29": dial tcp: lookup prometheus on 10.59.240.10:53: no such host
+  Normal   Synced  17m                flagger  Initialization done! frontend.microservices-demo
+  Normal   Synced  3m37s              flagger  New revision detected! Scaling up frontend.microservices-demo
+  Normal   Synced  2m37s              flagger  Starting canary analysis for frontend.microservices-demo
+  Normal   Synced  2m37s              flagger  Advance frontend.microservices-demo canary weight 10
+  Warning  Synced  97s                flagger  Prometheus query failed: running query failed: request failed: Get "http://prometheus:9090/api/v1/query?query=+sum%28+rate%28+istio_requests_total%7B+reporter%3D%22destination%22%2C+destination_workload_namespace%3D%22microservices-demo%22%2C+destination_workload%3D~%22frontend%22%2C+response_code%21~%225.%2A%22+%7D%5B1m%5D+%29+%29+%2F+sum%28+rate%28+istio_requests_total%7B+reporter%3D%22destination%22%2C+destination_workload_namespace%3D%22microservices-demo%22%2C+destination_workload%3D~%22frontend%22+%7D%5B1m%5D+%29+%29+%2A+100": dial tcp: lookup prometheus on 10.59.240.10:53: no such host
+  Warning  Synced  37s                flagger  Rolling back frontend.microservices-demo failed checks threshold reached 1
+  Warning  Synced  37s                flagger  Canary failed! Scaling down frontend.microservices-demo
+```
+ага, нет Prometheus:
+
+надо ставить правильный Prometheus! и поправить манифест:
+```
+wget https://storage.googleapis.com/gke-release/istio/release/1.0.6-gke.1/patches/install-prometheus.yaml
+kubectl -n istio-system apply -f install-prometheus.yaml
+```
+теперь проблема с request-success-rate метрикой, ее никто не поставляет.
+
+поставим графану
+```
+helm upgrade -i flagger-grafana flagger/grafana \
+--namespace=istio-system \
+--set url=http://prometheus:9090 \
+--set user=admin \
+--set password=admin
+```
+пересобираем и пушим frontend image - работает!
+[canary.PNG](./kubernetes-gitops/canary.PNG)
+
+```text
+Events:
+  Type     Reason  Age                From     Message
+  ----     ------  ----               ----     -------
+  Warning  Synced  43m                flagger  frontend-primary.microservices-demo not ready: waiting for rollout to finish: observed deployment generation less then desired generation
+  Normal   Synced  43m (x2 over 43m)  flagger  all the metrics providers are available!
+  Normal   Synced  43m                flagger  Initialization done! frontend.microservices-demo
+  Normal   Synced  30m (x2 over 38m)  flagger  Starting canary analysis for frontend.microservices-demo
+  Normal   Synced  20m (x3 over 38m)  flagger  New revision detected! Scaling up frontend.microservices-demo
+  Normal   Synced  20m (x2 over 38m)  flagger  Advance frontend.microservices-demo canary weight 10
+  Normal   Synced  20m (x4 over 35m)  flagger  (combined from similar events): Starting canary analysis for frontend.microservices-demo
+  Normal   Synced  19m (x3 over 37m)  flagger  Advance frontend.microservices-demo canary weight 20
+  Normal   Synced  19m (x3 over 37m)  flagger  Advance frontend.microservices-demo canary weight 30
+  Normal   Synced  18m (x2 over 36m)  flagger  Copying frontend.microservices-demo template spec to frontend-primary.microservices-demo
+  Normal   Synced  18m (x3 over 36m)  flagger  Routing all traffic to primary
+  Normal   Synced  17m (x2 over 27m)  flagger  Promotion completed! Scaling down frontend.microservices-demo
+
+$ kubectl get pods -n microservices-demo
+NAME                                     READY   STATUS    RESTARTS   AGE
+adservice-d9cccddc7-829np                2/2     Running   0          14h
+cartservice-5777d679cb-x9948             2/2     Running   3          14h
+cartservice-redis-master-0               2/2     Running   0          14h
+checkoutservice-7b5c745c-7brg5           2/2     Running   0          14h
+currencyservice-9cc946bc5-nllpw          2/2     Running   0          14h
+emailservice-b8bc9bb75-q7z7v             2/2     Running   0          14h
+frontend-79c5b4954b-4nd4s                2/2     Running   0          82s
+frontend-primary-78dc4d7794-lg882        2/2     Running   0          9m22s
+loadgenerator-75c8675578-ds9dz           2/2     Running   1          14h
+paymentservice-cd9c5b799-tgns2           2/2     Running   0          14h
+productcatalogservice-5b7469cd59-jtmxp   2/2     Running   0          14h
+recommendationservice-6845f785f4-q7w48   2/2     Running   0          14h
+shippingservice-66f9bf485d-mgnfl         2/2     Running   0          14h
+```
+
 # Выполнено ДЗ № 10
 # Hashicorp Vault + k8s
 
