@@ -2,6 +2,297 @@
 # ДЗ по курсу "Инфраструктурная платформа на основе Kubernetes"
 dimpon Platform repository
 
+# Выполнено ДЗ № 12
+
+ - [ ] Установлен CSI драйвер, создан pvc, pod, сделан snapshot, восстановлен pvc-pv из snapshot
+
+## В процессе сделано:
+ - Установлен CSI драйвер1
+ - создан pvc, pod
+ - сделан snapshot, восстановлен pvc-pv из snapshot
+
+## Как запустить проект:
+ 
+### Скачиваем репозиторий с CSI драйвером:
+``git clone https://github.com/kubernetes-csi/csi-driver-host-path.git`` 
+ 
+### Устанавливаем VolumeSnapshot CRD и Snapshot controller. Применяем CRD:
+```./kubernetes-storage/hw/snapshotter.sh ``
+
+### Устанавливаем CSI драйвер:
+``./csi-driver-host-path/deploy/util/deploy-hostpath.sh ./kubernetes-1.18``
+output как написано тут:
+https://github.com/kubernetes-csi/csi-driver-host-path/blob/master/docs/deploy-1.17-and-later.md
+
+проверяем
+```
+$ kubectl get pods
+NAME                         READY   STATUS    RESTARTS   AGE
+csi-hostpath-attacher-0      1/1     Running   0          2m57s
+csi-hostpath-provisioner-0   1/1     Running   0          2m42s
+csi-hostpath-resizer-0       1/1     Running   0          2m37s
+csi-hostpath-snapshotter-0   1/1     Running   0          2m33s
+csi-hostpath-socat-0         1/1     Running   0          2m27s
+csi-hostpathplugin-0         3/3     Running   0          2m46s
+snapshot-controller-0        1/1     Running   0          36m
+```
+### Ставим приложение
+```
+kubectl apply -f pvc.yaml
+kubectl apply -f sc.yaml
+kubectl apply -f pod.yaml
+```
+проверим
+```
+$ kubectl get sc -o wide
+NAME                 PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+csi-hostpath-sc      hostpath.csi.k8s.io     Delete          Immediate              true                   84s
+standard (default)   rancher.io/local-path   Delete          WaitForFirstConsumer   false                  58m
+
+$ kubectl get pvc -o wide
+NAME          STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS      AGE    VOLUMEMODE
+storage-pvc   Bound    pvc-0d24cfcd-79f6-491b-83e0-a9bd021d25dc   1Gi        RWO            csi-hostpath-sc   102s   Filesystem
+
+$ kubectl get pv -o wide
+NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                 STORAGECLASS      REASON   AGE    VOLUMEMODE
+pvc-0d24cfcd-79f6-491b-83e0-a9bd021d25dc   1Gi        RWO            Delete           Bound    default/storage-pvc   csi-hostpath-sc            118s   Filesystem
+
+$ kubectl get volumeattachment
+NAME                                                                   ATTACHER              PV                                         NODE           ATTACHED   AGE
+csi-0fdc78411df9826094540be2bb0588ada261c8c1253cfc32f3f7da09a9067512   hostpath.csi.k8s.io   pvc-0d24cfcd-79f6-491b-83e0-a9bd021d25dc   kind-worker2   true       2m56s
+
+```
+pod:
+```
+$ kubectl describe pods/storage-pod
+Name:         storage-pod
+Namespace:    default
+Priority:     0
+Node:         kind-worker2/172.18.0.3
+Start Time:   Sat, 17 Oct 2020 23:44:25 +0200
+Labels:       <none>
+Annotations:  Status:  Running
+IP:           10.244.3.8
+IPs:
+  IP:  10.244.3.8
+Containers:
+  nginx:
+    Container ID:   containerd://ca9d5cbf1259e38888404d358a6e63ffa15976ecce76fd6bf36bb1b9587379b8
+    Image:          nginx
+    Image ID:       docker.io/library/nginx@sha256:ed7f815851b5299f616220a63edac69a4cc200e7f536a56e421988da82e44ed8
+    Port:           <none>
+    Host Port:      <none>
+    State:          Running
+      Started:      Sat, 17 Oct 2020 23:44:53 +0200
+    Ready:          True
+    Restart Count:  0
+    Environment:    <none>
+    Mounts:
+      /data from custom-csi-volume (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from default-token-k6cjs (ro)
+Conditions:
+  Type              Status
+  Initialized       True
+  Ready             True
+  ContainersReady   True
+  PodScheduled      True
+Volumes:
+  custom-csi-volume:
+    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:  storage-pvc
+    ReadOnly:   false
+  default-token-k6cjs:
+    Type:        Secret (a volume populated by a Secret)
+    SecretName:  default-token-k6cjs
+    Optional:    false
+QoS Class:       BestEffort
+Node-Selectors:  <none>
+Tolerations:     node.kubernetes.io/not-ready:NoExecute for 300s
+                 node.kubernetes.io/unreachable:NoExecute for 300s
+Events:
+  Type    Reason                  Age    From                     Message
+  ----    ------                  ----   ----                     -------
+  Normal  Scheduled               5m41s  default-scheduler        Successfully assigned default/storage-pod to kind-worker2
+  Normal  SuccessfulAttachVolume  5m41s  attachdetach-controller  AttachVolume.Attach succeeded for volume "pvc-0d24cfcd-79f6-491b-83e0-a9bd021d25dc"
+  Normal  Pulling                 5m33s  kubelet, kind-worker2    Pulling image "nginx"
+  Normal  Pulled                  5m14s  kubelet, kind-worker2    Successfully pulled image "nginx"
+  Normal  Created                 5m13s  kubelet, kind-worker2    Created container nginx
+  Normal  Started                 5m13s  kubelet, kind-worker2    Started container nginx
+
+```
+
+### создадим файл внутри Pod
+```
+$ kubectl exec -ti storage-pod bash
+kubectl exec [POD] [COMMAND] is DEPRECATED and will be removed in a future version. Use kubectl kubectl exec [POD] -- [COMMAND] instead.
+root@storage-pod:/#
+root@storage-pod:/# cd data/
+root@storage-pod:/data#
+root@storage-pod:/data# echo 'Hello World! test file' > index.html
+root@storage-pod:/data# cat index.html
+Hello World! test file
+root@storage-pod:/data#
+```
+
+### Создаем shapshot
+``kubectl apply -f snapshot.yaml``
+проверяем
+```
+$ kubectl get volumesnapshot
+NAME       AGE
+snapshot   40s
+```
+
+```
+$ kubectl describe volumesnapshot snapshot
+Name:         snapshot
+Namespace:    default
+Labels:       <none>
+Annotations:  API Version:  snapshot.storage.k8s.io/v1beta1
+Kind:         VolumeSnapshot
+Metadata:
+  Creation Timestamp:  2020-10-17T21:56:24Z
+  Finalizers:
+    snapshot.storage.kubernetes.io/volumesnapshot-as-source-protection
+    snapshot.storage.kubernetes.io/volumesnapshot-bound-protection
+  Generation:  1
+  Managed Fields:
+    API Version:  snapshot.storage.k8s.io/v1beta1
+    Fields Type:  FieldsV1
+    fieldsV1:
+      f:status:
+        f:creationTime:
+        f:readyToUse:
+        f:restoreSize:
+    Manager:         snapshot-controller
+    Operation:       Update
+    Time:            2020-10-17T21:56:25Z
+  Resource Version:  13307
+  Self Link:         /apis/snapshot.storage.k8s.io/v1beta1/namespaces/default/volumesnapshots/snapshot
+  UID:               0ec7a00f-e957-495e-a039-82f5568d437c
+Spec:
+  Source:
+    Persistent Volume Claim Name:  storage-pvc
+  Volume Snapshot Class Name:      csi-hostpath-snapclass
+Status:
+  Bound Volume Snapshot Content Name:  snapcontent-0ec7a00f-e957-495e-a039-82f5568d437c
+  Creation Time:                       2020-10-17T21:56:24Z
+  Ready To Use:                        true
+  Restore Size:                        1Gi
+Events:                                <none>
+
+```
+
+```
+$ kubectl get volumesnapshotcontents.snapshot.storage.k8s.io
+NAME                                               AGE
+snapcontent-0ec7a00f-e957-495e-a039-82f5568d437c   3m15s
+```
+
+```
+$ kubectl describe volumesnapshotcontents.snapshot.storage.k8s.io snapcontent-0ec7a00f-e957-495e-a039-82f5568d437c
+Name:         snapcontent-0ec7a00f-e957-495e-a039-82f5568d437c
+Namespace:
+Labels:       <none>
+Annotations:  <none>
+API Version:  snapshot.storage.k8s.io/v1beta1
+Kind:         VolumeSnapshotContent
+Metadata:
+  Creation Timestamp:  2020-10-17T21:56:24Z
+  Finalizers:
+    snapshot.storage.kubernetes.io/volumesnapshotcontent-bound-protection
+  Generation:  1
+  Managed Fields:
+    API Version:  snapshot.storage.k8s.io/v1beta1
+    Fields Type:  FieldsV1
+    fieldsV1:
+      f:status:
+        .:
+        f:creationTime:
+        f:readyToUse:
+        f:restoreSize:
+        f:snapshotHandle:
+    Manager:      csi-snapshotter
+    Operation:    Update
+    Time:         2020-10-17T21:56:24Z
+    API Version:  snapshot.storage.k8s.io/v1beta1
+    Fields Type:  FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:finalizers:
+          .:
+          v:"snapshot.storage.kubernetes.io/volumesnapshotcontent-bound-protection":
+    Manager:         snapshot-controller
+    Operation:       Update
+    Time:            2020-10-17T21:56:24Z
+  Resource Version:  13305
+  Self Link:         /apis/snapshot.storage.k8s.io/v1beta1/volumesnapshotcontents/snapcontent-0ec7a00f-e957-495e-a039-82f5568d437c
+  UID:               9f5356c5-d667-46a2-ad4f-a12c339a7c3e
+Spec:
+  Deletion Policy:  Delete
+  Driver:           hostpath.csi.k8s.io
+  Source:
+    Volume Handle:             eaf14bed-10c1-11eb-be56-2ef9328635df
+  Volume Snapshot Class Name:  csi-hostpath-snapclass
+  Volume Snapshot Ref:
+    API Version:       snapshot.storage.k8s.io/v1beta1
+    Kind:              VolumeSnapshot
+    Name:              snapshot
+    Namespace:         default
+    Resource Version:  13295
+    UID:               0ec7a00f-e957-495e-a039-82f5568d437c
+Status:
+  Creation Time:    1602971784696642200
+  Ready To Use:     true
+  Restore Size:     1073741824
+  Snapshot Handle:  999f808f-10c3-11eb-be56-2ef9328635df
+Events:             <none>
+
+```
+проверим на ноде
+```
+$ docker exec -ti kind-worker2 bash
+root@kind-worker2:/# cd /var/lib/csi-hostpath-data/
+root@kind-worker2:/var/lib/csi-hostpath-data# ll
+total 16
+drwxr-xr-x  3 root root 4096 Oct 17 21:56 ./
+drwxr-xr-x 13 root root 4096 Oct 17 21:30 ../
+-rw-r--r--  1 root root  155 Oct 17 21:56 999f808f-10c3-11eb-be56-2ef9328635df.snap
+drwxr-xr-x  2 root root 4096 Oct 17 21:53 eaf14bed-10c1-11eb-be56-2ef9328635df/
+```
+
+### Удаляем pod,pvc,pv:
+```
+kubectl delete pod storage-pod
+kubectl delete pvc storage-pvc
+kubectl get pv
+No resources found in default namespace.
+kubectl get pvc
+No resources found in default namespace.
+```
+
+### восстанавливаем
+``kubectl apply -f restore.yaml``
+
+проверим
+```
+$ kubectl get pvc
+NAME          STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS      AGE
+storage-pvc   Bound    pvc-1e4919ad-e9ea-4046-b0f8-214afc506d2c   1Gi        RWO            csi-hostpath-sc   36s
+```
+
+проверим данные в pod
+kubectl apply -f pod.yaml
+
+```
+$ kubectl exec storage-pod -- cat data/index.html
+Hello World! test file
+```
+Magic! index.html в Pod-e!
+
+
+## PR checklist:
+ - [ ] Выставлен label с темой домашнего задания
 
 # Выполнено ДЗ № 11
 
@@ -11,7 +302,7 @@ dimpon Platform repository
 ## В процессе сделано:
  - создан кластер
  - установлен flux
- - создан репозиторий прилодения в git lab, настроен pipeline для сборки и push docker images
+ - создан репозиторий приложения в git lab, настроен pipeline для сборки и push docker images
  - настроен автодеплой и обновление манифестов
  - установлен istio, добавлены sidecrs
  - установлен flagger, настрооен canary deploy. 
