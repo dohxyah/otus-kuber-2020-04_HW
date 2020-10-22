@@ -2,6 +2,185 @@
 # ДЗ по курсу "Инфраструктурная платформа на основе Kubernetes"
 dimpon Platform repository
 
+
+# Выполнено ДЗ № 13
+
+ - [ ] установлен плагин debug
+ - [ ] установлен iptables-tailer, запущен тест Netperf, исследованы проблемы с сетевыми политиками, настроен iptable1s-tailer для логирование пролем
+ - [ ] Задание с *
+ 
+### Debug and strace
+
+ставим debug и daemonset в minikube
+
+kubectl apply -f https://raw.githubusercontent.com/aylei/kubectl-debug/master/scripts/agent_daemonset.yml
+
+стаыим Pod из 1го задания
+
+kubectl debug --agentless=false web
+
+```
+bash-5.0# strace -c -p1
+strace: Process 1 attached
+```
+
+```
+$ kubectl debug web
+pulling image nicolaka/netshoot:latest...
+latest: Pulling from nicolaka/netshoot
+Digest: sha256:04786602e5a9463f40da65aea06fe5a825425c7df53b307daa21f828cfe40bf8
+Status: Image is up to date for nicolaka/netshoot:latest
+starting debug container...
+container created, open tty...
+bash-5.0# hostname
+web
+bash-5.0# ps -ef
+PID   USER     TIME  COMMAND
+    1 1001      0:00 nginx: master process nginx -g daemon off;
+    6 1001      0:00 nginx: worker process
+    7 1001      0:00 nginx: worker process
+   33 root      0:00 bash
+   39 root      0:00 ps -ef
+bash-5.0# netstat
+Active Internet connections (w/o servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State
+Active UNIX domain sockets (w/o servers)
+Proto RefCnt Flags       Type       State         I-Node Path
+unix  3      [ ]         STREAM     CONNECTED      44851
+unix  3      [ ]         STREAM     CONNECTED      44852
+unix  3      [ ]         STREAM     CONNECTED      44853
+unix  3      [ ]         STREAM     CONNECTED      44854
+```
+[screen](./kubernetes-debug/screen/htop.png)
+
+### iptables-tailer
+в GKE кластере 
+ 
+ставим iptables-tailer и запускаем тест:
+
+```
+kubectl apply -f kit/deploy/crd.yaml
+kubectl apply -f kit/deploy/rbac.yaml
+kubectl apply -f kit/deploy/operator.yaml
+kubectl apply -f kit/deploy/cr.yaml
+```
+
+```
+$  kubectl describe netperf.app.example.com/example
+Name:         example
+Namespace:    default
+Labels:       <none>
+Annotations:  API Version:  app.example.com/v1alpha1
+Kind:         Netperf
+Metadata:
+  Creation Timestamp:  2020-10-22T20:36:13Z
+  Generation:          4
+  Resource Version:    7215
+  Self Link:           /apis/app.example.com/v1alpha1/namespaces/default/netperfs/example
+  UID:                 400a3e4e-dffc-471c-b5b2-a1955e77fc2c
+Spec:
+  Client Node:
+  Server Node:
+Status:
+  Client Pod:          netperf-client-a1955e77fc2c
+  Server Pod:          netperf-server-a1955e77fc2c
+  Speed Bits Per Sec:  8111.1
+  Status:              Done
+Events:                <none>
+``` 
+применили политику
+`` kubectl apply -f kit/netperf-calico-policy.yaml``
+
+тeст висит
+```
+$ kubectl describe netperf.app.example.com/example
+Name:         example
+Namespace:    default
+Labels:       <none>
+Annotations:  API Version:  app.example.com/v1alpha1
+Kind:         Netperf
+Metadata:
+  Creation Timestamp:  2020-10-22T20:41:41Z
+  Generation:          3
+  Resource Version:    9161
+  Self Link:           /apis/app.example.com/v1alpha1/namespaces/default/netperfs/example
+  UID:                 7ac8bdd1-7bf3-4aa0-9994-b520e473ff0a
+Spec:
+  Client Node:
+  Server Node:
+Status:
+  Client Pod:          netperf-client-b520e473ff0a
+  Server Pod:          netperf-server-b520e473ff0a
+  Speed Bits Per Sec:  0
+  Status:              Started test
+Events:                <none>
+```
+запустим iptables-tailer
+```
+kubectl apply -f kit/deploy/kit-serviceaccount.yaml
+kubectl apply -f kit/deploy/kit-clusterrole.yaml
+kubectl apply -f kit/deploy/kit-clusterrolebinding.yaml
+kubectl apply -f kit/deploy/iptables-tailer.yaml
+```
+
+iptables-tailer не накатывается, неправильный селектор, исправим. apiVersion и
+```
+  selector:
+    matchLabels:
+      app: "kube-iptables-tailer"
+```
+перезапустим тест
+```
+kubectl delete -f kit/deploy/cr.yaml
+kubectl apply -f kit/deploy/cr.yaml
+```
+``kubectl describe pod --selector=app=netperf-operator`` видим в eventax !!!
+```
+Events:
+  Type     Reason      Age   From                                                    Message
+  ----     ------      ----  ----                                                    -------
+  Normal   Scheduled   64s   default-scheduler                                       Successfully assigned default/netperf-server-c9437af48cc7 to gke-cluster-tailer-default-pool-332e4382-bcxr
+  Normal   Pulled      63s   kubelet, gke-cluster-tailer-default-pool-332e4382-bcxr  Container image "tailoredcloud/netperf:v2.7" already present on machine
+  Normal   Created     63s   kubelet, gke-cluster-tailer-default-pool-332e4382-bcxr  Created container netperf-server-c9437af48cc7
+  Normal   Started     63s   kubelet, gke-cluster-tailer-default-pool-332e4382-bcxr  Started container netperf-server-c9437af48cc7
+  Warning  PacketDrop  61s   kube-iptables-tailer                                    Packet dropped when receiving traffic from 10.0.1.18
+```
+
+исправим netperf-calico-policy.yaml
+`` kubectl apply -f kit/netperf-calico-policy-fixed.yaml``
+
+
+Netperf тест заработал!
+```
+$ kubectl describe netperf.app.example.com/example
+Name:         example
+Namespace:    default
+Labels:       <none>
+Annotations:  API Version:  app.example.com/v1alpha1
+Kind:         Netperf
+Metadata:
+  Creation Timestamp:  2020-10-22T21:12:17Z
+  Generation:          4
+  Resource Version:    19965
+  Self Link:           /apis/app.example.com/v1alpha1/namespaces/default/netperfs/example
+  UID:                 db6300e8-006a-4011-a9dc-58b918c256a7
+Spec:
+  Client Node:
+  Server Node:
+Status:
+  Client Pod:          netperf-client-58b918c256a7
+  Server Pod:          netperf-server-58b918c256a7
+  Speed Bits Per Sec:  8277.37
+  Status:              Done
+Events:                <none>
+```
+
+чтобы в логе было имя пода вместо IP:
+```
+ - name: "POD_IDENTIFIER"
+   value: "name_with_namespace"
+```
+
 # Выполнено ДЗ № 12
 
  - [ ] Установлен CSI драйвер, создан pvc, pod, сделан snapshot, восстановлен pvc-pv из snapshot
